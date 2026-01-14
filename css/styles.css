@@ -14,4 +14,5 @@ canvas {
   top: 10px;
   right: 10px;
   width: 380px;
+  z-index: 10;
 }

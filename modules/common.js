@@ -1,4 +1,11 @@
-import { WebGLRenderer, PerspectiveCamera, OrthographicCamera } from "three";
+import {
+  WebGLRenderer,
+  PerspectiveCamera,
+  OrthographicCamera,
+  SRGBColorSpace,
+  ACESFilmicToneMapping,
+  Clock,
+} from "three";
 import { OrbitControls } from "OrbitControls";
 import { signal } from "reactive";
 
@@ -27,6 +34,10 @@ function getWebGLRenderer() {
     preserveDrawingBuffer: true,
   });
   renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+
   document.body.appendChild(renderer.domElement);
   return renderer;
 }
@@ -88,6 +99,14 @@ function resize() {
   }
 }
 
+let running = true;
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    running = !running;
+  }
+});
+
 function render(fn) {
   requestAnimationFrame(() => render(fn));
   fn();
@@ -95,6 +114,8 @@ function render(fn) {
 
 const camera = getCamera();
 const controls = new OrbitControls(camera, renderer.domElement);
+
+const clock = new Clock();
 
 export {
   fromDefaults,
@@ -105,4 +126,6 @@ export {
   camera,
   controls,
   render,
+  running,
+  clock,
 };

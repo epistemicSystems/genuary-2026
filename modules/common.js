@@ -105,6 +105,10 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     running = !running;
   }
+  if (e.code === "Tab") {
+    document.body.classList.toggle("hide-ui");
+    e.preventDefault();
+  }
 });
 
 function render(fn) {

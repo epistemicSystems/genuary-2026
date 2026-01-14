@@ -6,7 +6,7 @@ import {
   ACESFilmicToneMapping,
   Clock,
 } from "three";
-import { OrbitControls } from "OrbitControls";
+import { OrbitControls } from "third_party/OrbitControls.js";
 import { signal } from "reactive";
 
 console.log("Common module loaded");

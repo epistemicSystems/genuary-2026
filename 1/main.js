@@ -60,7 +60,7 @@ gui.addSlider("Metalness", params.metalness, 0, 1, 0.01);
 gui.addButton("Random", randomize);
 gui.addSeparator();
 gui.addText(
-  "<p>Press R to randomize colors and shapes.</p><p>Press Space to toggle rotation.</p>"
+  "<p>Press R to randomize colors and shapes.</p><p>Press Space to toggle rotation.</p><p>Press Tab to toggle this GUI.</p>"
 );
 gui.show();
 

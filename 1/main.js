@@ -60,7 +60,7 @@ gui.addSlider("Metalness", params.metalness, 0, 1, 0.01);
 gui.addButton("Random", randomize);
 gui.addSeparator();
 gui.addText(
-  "<p>Press R to randomize colors and shapes.</p><p>Press Space to toggle rotation.</p><p>Press Tab to toggle this GUI.</p>"
+  "<p>Press <b>R</b> or <b>click</b> on screen to randomize colors and shapes.</p><p>Press <b>Space</b> to toggle rotation.</p><p>Press <b>Tab</b> to toggle this GUI.</p>"
 );
 gui.show();
 
@@ -224,6 +224,19 @@ function randomize() {
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyR") {
+    randomize();
+  }
+});
+
+let clickOnPlace = false;
+window.addEventListener("pointerdown", () => {
+  clickOnPlace = true;
+});
+window.addEventListener("pointermove", () => {
+  clickOnPlace = false;
+});
+window.addEventListener("pointerup", () => {
+  if (clickOnPlace) {
     randomize();
   }
 });

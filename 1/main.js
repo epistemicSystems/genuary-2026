@@ -47,6 +47,7 @@ const defaults = {
 
 const params = fromDefaults(defaults);
 const blendFactor = tweened(0, 1000);
+const scaleFactor = tweened(0, 1000);
 
 const colorFrom = new Color(Maf.randomElement(rainbow));
 const colorTo = new Color(Maf.randomElement(rainbow));
@@ -154,6 +155,8 @@ function loadEnvironment(resolution = "2k", type = "HalfFloatType") {
       material.envMap = texture;
       material.envMapIntensity = 1.0;
       material.needsUpdate = true;
+
+      scaleFactor.set(1, 1000);
     }
   );
 }
@@ -259,6 +262,8 @@ render(() => {
   );
   renderer.setClearColor(material.color);
   uniforms.factor.value = blendFactor();
+
+  mesh.scale.setScalar(Easings.OutElastic(scaleFactor()));
 
   if (running) {
     mesh.rotation.x += 0.5 * dt;

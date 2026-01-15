@@ -227,15 +227,19 @@ window.addEventListener("keydown", (e) => {
     randomize();
   }
 });
+document.querySelector("#randomize-button")?.addEventListener("click", () => {
+  randomize();
+});
 
 let clickOnPlace = false;
-window.addEventListener("pointerdown", () => {
+const canvas = renderer.domElement;
+canvas.addEventListener("pointerdown", () => {
   clickOnPlace = true;
 });
-window.addEventListener("pointermove", () => {
+canvas.addEventListener("pointermove", () => {
   clickOnPlace = false;
 });
-window.addEventListener("pointerup", () => {
+canvas.addEventListener("pointerup", () => {
   if (clickOnPlace) {
     randomize();
   }

@@ -33,6 +33,10 @@ body {
   }
 }
 
+#gui-container {
+  flex: 1;
+}
+
 .hide-ui #main-gui {
   display: none;
 }
@@ -59,7 +63,7 @@ canvas {
     position: fixed;
     top: 10px;
     right: 10px;
-    width: 380px;
+    width: 520px;
   }
 }
 
@@ -70,10 +74,6 @@ canvas {
     left: 10px;
     right: 10px;
     align-items: flex-end;
-
-    #gui-container {
-      flex: 1;
-    }
 
     .gui-scroller {
       max-height: 50vh;

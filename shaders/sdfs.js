@@ -150,6 +150,12 @@ float sdTetrahedron(vec3 p, float r, float roundness) {
     float d = (planeDist < 0.0) ? planeDist : exact;
 
     return d - roundness;
-}`;
+}
+    
+float sdRoundedCylinder( vec3 p, float ra, float rb, float h ) {
+  vec2 d = vec2( length(p.xz)-ra+rb, abs(p.y) - h + rb );
+  return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - rb;
+}
+`;
 
 export { shader };

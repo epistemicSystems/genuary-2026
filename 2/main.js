@@ -143,7 +143,7 @@ hemiLight.groundColor.setHSL(0.095, 1, 0.75);
 hemiLight.position.set(0, 50, 0);
 scene.add(hemiLight);
 
-camera.position.set(0, 0, 1).multiplyScalar(10);
+camera.position.set(0, 0, 1).multiplyScalar(14);
 camera.lookAt(0, 0, 0);
 
 function randomize() {

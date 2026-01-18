@@ -54,8 +54,8 @@ const defaults = {
   points: 1,
   range: [0, 0.25],
   scale: 1,
-  roughness: 0.5,
-  metalness: 0.25,
+  roughness: 0.25,
+  metalness: 0.5,
   offsetAngle: 0,
   offsetDistance: 0,
 };
@@ -295,12 +295,12 @@ function generateStrand(
   material.syncRenderer(renderer);
   // const geometry = new RoundedCylinderGeometry(0.1, 100, 0.1, 5, 32, 100);
   // material.uniforms.meshLength.value = 100;
-  // const geometry = new IcosahedronGeometry(0.1, res);
-  // material.uniforms.meshLength.value = 0.2;
+  const geometry = new IcosahedronGeometry(0.1, res);
+  material.uniforms.meshLength.value = 0.2;
   // geometry.scale(1, 1, 1);
-  const geometry = new TorusGeometry(0.1, 0.05, 64, 200);
-  geometry.scale(1.5, 1, 1);
-  material.uniforms.meshLength.value = 0.3;
+  // const geometry = new TorusGeometry(0.1, 0.05, 64, 200);
+  // geometry.scale(1.5, 1, 1);
+  // material.uniforms.meshLength.value = 0.3;
   geometry.rotateX(Math.PI / 2);
 
   const mesh = new Mesh(geometry, material);
@@ -318,15 +318,15 @@ const strandObjects = [];
 
 function init() {
   const gradient = new GradientLinear(rainbow);
-  const levels = 7;
-  const parts = 3;
+  const levels = 8;
+  const parts = 1;
   let d = 0;
   for (let i = 1; i < levels; i++) {
     const strands = fibonacci(i);
     const size = Maf.map(1, levels, 0.5, 0.5, i);
     const startAngle = Maf.PI / strands;
     const frequency = Maf.map(1, levels, 1, 2, i);
-    const res = Math.round(Maf.map(1, levels, 10, 100, i));
+    const res = Math.round(Maf.map(1, levels, 1, 20, i));
     const offset = Maf.randomInRange(0, 1);
     for (let j = 0; j < strands; j++) {
       for (let k = 0; k < parts; k++) {
@@ -337,7 +337,7 @@ function init() {
           size,
           frequency,
           0, //start,
-          0.25, //start + 1 / (2 * parts),
+          0.5, //start + 1 / (2 * parts),
           gradient.getAt(Maf.map(1, levels - 1, 0, 1, i)),
           Maf.randomInRange(0, Maf.TAU),
           res
@@ -367,13 +367,6 @@ render(() => {
   controls.update();
 
   const dt = clock.getDelta();
-  // material.uniforms`.roughness.value = params.roughness();
-  // material.uniforms.metalness.value = params.metalness();
-  // material.uniforms.offsetAngle.value = params.offsetAngle();
-  // material.uniforms.offsetDistance.value = params.offsetDistance();
-  // material.uniforms.scale.value = params.scale();
-  // material.uniforms.start.value = params.range()[0];
-  // material.uniforms`.end.value = params.range()[1];
 
   for (const strand of strandObjects) {
     const material = strand.strand.material;

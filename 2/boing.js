@@ -8,33 +8,49 @@ uniform float start;
 uniform float end;
 uniform float scale;
 uniform float meshLength;
-uniform vec3 pathPoint0;
-uniform vec3 pathPoint1;
-uniform vec3 pathPoint2;
-uniform vec3 pathPoint3;
 
 const int INTEGRATION_STEPS = 25; 
+const float TAU = 6.28318530718;
+const float knotScale = 1.;
 
-vec3 getBezierPoint(float t, vec3 p0, vec3 p1, vec3 p2, vec3 p3) {
-  float u = 1.0 - t;
-  float tt = t * t;
-  float uu = u * u;
-  float uuu = uu * u;
-  float ttt = tt * t;
+// vec3 getBezierPoint(float t, vec3 p0, vec3 p1, vec3 p2, vec3 p3) {
+//   float u = 1.0 - t;
+//   float tt = t * t;
+//   float uu = u * u;
+//   float uuu = uu * u;
+//   float ttt = tt * t;
 
-  vec3 p = uuu * p0; 
-  p += 3.0 * uu * t * p1; 
-  p += 3.0 * u * tt * p2; 
-  p += ttt * p3;
-  return p;
+//   vec3 p = uuu * p0; 
+//   p += 3.0 * uu * t * p1; 
+//   p += 3.0 * u * tt * p2; 
+//   p += ttt * p3;
+//   return p;
+// }
+
+// vec3 getBezierTangent(float t, vec3 p0, vec3 p1, vec3 p2, vec3 p3) {
+//   float u = 1.0 - t;
+//   return normalize(3.0 * u * u * (p1 - p0) + 
+//                     6.0 * u * t * (p2 - p1) + 
+//                     3.0 * t * t * (p3 - p2));
+
+// }
+
+vec3 getTrefoilPoint(float t) {
+  float angle = t * TAU;
+  float x = sin(angle) + 2.0 * sin(2.0 * angle);
+  float y = cos(angle) - 2.0 * cos(2.0 * angle);
+  float z = -sin(3.0 * angle);
+  return vec3(x, y, z) * knotScale;
 }
 
-vec3 getBezierTangent(float t, vec3 p0, vec3 p1, vec3 p2, vec3 p3) {
-  float u = 1.0 - t;
-  return normalize(3.0 * u * u * (p1 - p0) + 
-                    6.0 * u * t * (p2 - p1) + 
-                    3.0 * t * t * (p3 - p2));
+vec3 getTrefoilTangent(float t) {
+  float angle = t * TAU;
+  float dx = cos(angle) + 4.0 * cos(2.0 * angle);
+  float dy = -sin(angle) + 4.0 * sin(2.0 * angle);
+  float dz = -3.0 * cos(3.0 * angle);
+  return normalize(vec3(dx, dy, dz));
 }
+
 
 mat3 axisAngleMatrix(vec3 axis, float angle) {
     float c = cos(angle);
@@ -52,10 +68,11 @@ void calculate(in vec3 position, out vec3 newPos, out vec3 newNormal) {
     
     float myT = (position.z / meshLength) + 0.5;
     myT = (end - start) * myT + start;
-    myT = clamp(myT, 0.0, 1.0);
+    myT = mod(myT, 1.0);
+    // myT = clamp(myT, 0.0, 1.0);
 
-    vec3 currentPos = getBezierPoint(0.0, pathPoint0, pathPoint1, pathPoint2, pathPoint3);
-    vec3 T = getBezierTangent(0.0, pathPoint0, pathPoint1, pathPoint2, pathPoint3);
+    vec3 currentPos = getTrefoilPoint(0.0);
+    vec3 T = getTrefoilTangent(0.0);
     
     vec3 up = vec3(0.0, 1.0, 0.0);
     
@@ -70,7 +87,7 @@ void calculate(in vec3 position, out vec3 newPos, out vec3 newNormal) {
         for (int i = 1; i <= INTEGRATION_STEPS; i++) {
             float t_next = float(i) * dt;
             
-            vec3 T_next = getBezierTangent(t_next, pathPoint0, pathPoint1, pathPoint2, pathPoint3);
+            vec3 T_next = getTrefoilTangent(t_next);
             
             vec3 axis = cross(T, T_next);
             float len = length(axis);
@@ -93,7 +110,7 @@ void calculate(in vec3 position, out vec3 newPos, out vec3 newNormal) {
             T = T_next;
         }
         
-        currentPos = getBezierPoint(myT, pathPoint0, pathPoint1, pathPoint2, pathPoint3);
+        currentPos = getTrefoilPoint(myT);
     }
 
     newPos = currentPos + (N * position.x * scale) + (B * position.y * scale);
@@ -112,19 +129,18 @@ class Boing {
     this.globalScale = 1;
     this.progress = 0;
     this.time = Maf.randomInRange(700, 1300);
-    this.minLength = Maf.randomInRange(0.01, 0.03);
-    this.scale =
-      Maf.map(700, 1300, 0, 1, this.time) * Maf.randomInRange(0.9, 1.1);
+    this.minLength = 0.005;
+    this.scale = Maf.randomInRange(0.8, 1.2);
+    this.start = 0;
+    this.length = 0.5;
+    this.speed = Maf.randomInRange(0.8, 1.2);
+    this.elapsedTime = 0;
 
     this.uniforms = {
       start: { value: 0.0 },
       end: { value: 1.0 },
       scale: { value: 1.0 },
-      pathPoint0: { value: new Vector3(-1, 0, 0) },
-      pathPoint1: { value: new Vector3(-0.5, 1.5, 0) },
-      pathPoint2: { value: new Vector3(2, 1.5, 0) },
-      pathPoint3: { value: new Vector3(1, 0, 0) },
-      meshLength: { value: 100.0 },
+      meshLength: { value: 1.0 },
     };
 
     this.material = new MeshStandardMaterial({
@@ -139,10 +155,6 @@ class Boing {
       shader.uniforms.start = this.uniforms.start;
       shader.uniforms.end = this.uniforms.end;
       shader.uniforms.scale = this.uniforms.scale;
-      shader.uniforms.pathPoint0 = this.uniforms.pathPoint0;
-      shader.uniforms.pathPoint1 = this.uniforms.pathPoint1;
-      shader.uniforms.pathPoint2 = this.uniforms.pathPoint2;
-      shader.uniforms.pathPoint3 = this.uniforms.pathPoint3;
       shader.uniforms.meshLength = this.uniforms.meshLength;
       shader.vertexShader = vertexShader + shader.vertexShader;
 
@@ -167,50 +179,45 @@ class Boing {
     };
 
     this.mesh = new Mesh(
-      new RoundedCylinderGeometry(0.2, 100, 0.01, 5, 32, 100),
+      new RoundedCylinderGeometry(0.2, 1, 0.1, 5, 32, 25),
       this.material
     );
     this.mesh.geometry.rotateX(Math.PI / 2);
+
+    this.randomize();
   }
 
-  randomize(target) {
-    const mid = new Vector3(
-      Maf.randomInRange(-1, 1),
-      Maf.randomInRange(-1, 1),
-      Maf.randomInRange(-1, 1)
-    )
-      .normalize()
-      .multiplyScalar(Maf.randomInRange(0.5, 1.5));
-
-    this.uniforms.pathPoint0.value.copy(this.uniforms.pathPoint3.value);
-    this.uniforms.pathPoint1.value.copy(this.uniforms.pathPoint2.value);
-
-    let f =
-      Math.random() > 0.5
-        ? Maf.randomInRange(0.1, 0.7)
-        : Maf.randomInRange(1.3, 2.9);
-    this.uniforms.pathPoint2.value.copy(target).multiplyScalar(f);
-    this.uniforms.pathPoint3.value.copy(target);
-
-    this.minLength = Maf.randomInRange(0.01, 0.03);
+  randomize() {
     this.progress = -Maf.randomInRange(0, 300);
+    this.start = this.start + this.length;
+    this.length = Maf.randomInRange(0.1, 0.3);
+    this.time = Maf.randomInRange(700, 1300);
+    this.elapsedTime = 0;
   }
 
   update(dt) {
+    this.elapsedTime += dt;
+    if (this.elapsedTime > (2 * this.time) / 1000) {
+      this.randomize();
+    }
+
     this.progress += dt * 1000;
+    this.start += (dt * this.speed) / 100;
 
     const factor = Math.max(0, Math.min(1, this.progress / this.time));
+
     const t = Easings.OutBounce(factor);
     const minLength = this.minLength;
-    const length = Math.max(minLength, Maf.parabola(t, 1) * 0.25);
+    const length = Math.max(minLength, Maf.parabola(t, 2) * 0.1);
 
-    const scale = 1 - this.scale * Maf.parabola(Easings.InOutCubic(t), 0.1);
-    const start = t * (1 - minLength);
-    const end = t + length;
+    const scale =
+      this.scale - 0.9 * this.scale * Maf.parabola(Easings.InOutCubic(t), 0.1);
+    const start = this.start + t * this.length;
+    const end = start + length;
 
     this.uniforms.start.value = start;
     this.uniforms.end.value = end;
-    this.uniforms.scale.value = scale * this.globalScale;
+    this.uniforms.scale.value = scale * this.scale * this.globalScale;
   }
 }
 

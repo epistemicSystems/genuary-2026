@@ -375,14 +375,14 @@ render(() => {
   // material.uniforms.start.value = params.range()[0];
   // material.uniforms`.end.value = params.range()[1];
 
-  if (running) {
-    for (const strand of strandObjects) {
-      const material = strand.strand.material;
+  for (const strand of strandObjects) {
+    const material = strand.strand.material;
+    if (running) {
       material.uniforms.offset.value += dt;
-
-      material.uniforms.roughness.value = params.roughness();
-      material.uniforms.metalness.value = params.metalness();
     }
+
+    material.uniforms.roughness.value = params.roughness();
+    material.uniforms.metalness.value = params.metalness();
   }
 
   renderer.render(scene, camera);

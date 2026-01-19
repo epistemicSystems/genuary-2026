@@ -409,6 +409,9 @@ window.addEventListener("keydown", (e) => {
     randomize();
   }
 });
+document.querySelector("#randomize-button")?.addEventListener("click", () => {
+  randomize();
+});
 
 render(() => {
   controls.update();

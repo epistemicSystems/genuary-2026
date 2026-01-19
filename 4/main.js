@@ -34,11 +34,11 @@ import {
   InstancedMesh,
   DirectionalLight,
 } from "three";
-import { Material, loadEnvMap } from "modules/material.js";
-import { RoundedCylinderGeometry } from "modules/rounded-cylinder-geometry.js";
+// import { Material, loadEnvMap } from "modules/material.js";
+// import { RoundedCylinderGeometry } from "modules/rounded-cylinder-geometry.js";
 import { GradientLinear } from "modules/gradient.js";
 import { ImprovedNoise } from "third_party/ImprovedNoise.js";
-import { RoundedBoxGeometry } from "third_party/three-rounded-box.js";
+// import { RoundedBoxGeometry } from "third_party/three-rounded-box.js";
 import { UltraHDRLoader } from "third_party/UltraHDRLoader.js";
 
 const rainbow = [

@@ -147,6 +147,10 @@
   min-height: 24px;
 }
 
+.gui-text {
+  width: 100%;
+}
+
 .gui-separator {
   background: #888;
   height: 1px;

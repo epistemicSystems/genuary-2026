@@ -41,9 +41,11 @@ import { ImprovedNoise } from "third_party/ImprovedNoise.js";
 import { RoundedBoxGeometry } from "third_party/three-rounded-box.js";
 import { UltraHDRLoader } from "third_party/UltraHDRLoader.js";
 import { sdTorus, sdIcosahedron } from "modules/raymarch.js";
+import { effect } from "reactive";
 // import { TrefoilSDF } from "modules/TrefoilSDF.js";
 
 const LEVELS = 7;
+let invalidateMap = false;
 
 const rainbow = [
   "#ef4444",
@@ -58,15 +60,33 @@ const rainbow = [
   "#f43f5e",
 ];
 
+const ocean = [
+  "#e0f2fe",
+  "#bae6fd",
+  "#7dd3fc",
+  "#38bdf8",
+  "#0ea5e9",
+  "#0284c7",
+  "#0369a1",
+  "#075985",
+  "#0c4a6e",
+  "#1e3a8a",
+].reverse();
+
+const palette = rainbow;
+
 const defaults = {
   seed: 1337,
   shape: "perlin",
+  noiseScale: 2,
+  torusRadius1: 0.7,
+  torusRadius2: 0.25,
   geometry: "box",
   range: [0, LEVELS],
   gap: 0.02,
   speed: 1,
-  roughness: 0.2,
-  metalness: 0.5,
+  roughness: 0.5,
+  metalness: 0.2,
 };
 
 const params = fromDefaults(defaults);
@@ -91,6 +111,9 @@ gui.addSelect(
   geometries.map((s) => [s.id, s.name]),
   params.geometry
 );
+gui.addSlider("Noise Scale", params.noiseScale, 1, 4, 0.01);
+gui.addSlider("Torus Radius 1", params.torusRadius1, 0.1, 1, 0.01);
+gui.addSlider("Torus Radius 2", params.torusRadius2, 0.05, 0.5, 0.01);
 gui.addRangeSlider("Range", params.range, 0, LEVELS, 1);
 gui.addSlider("Gap", params.gap, 0, 0.5, 0.01);
 gui.addSlider("Speed", params.speed, 0, 2, 0.01);
@@ -103,7 +126,7 @@ gui.addText(
 );
 gui.show();
 
-const color = rainbow[rainbow.length - 1];
+const color = palette[2];
 renderer.setClearColor(new Color(color));
 
 renderer.shadowMap.enabled = true;
@@ -121,6 +144,8 @@ light.shadow.camera.bottom = -1;
 light.shadow.camera.right = 1;
 light.shadow.camera.left = -1;
 light.shadow.mapSize.set(4096, 4096);
+light.shadow.camera.near = 5;
+light.shadow.camera.far = 15;
 scene.add(light);
 
 const hemiLight = new HemisphereLight(0xffffff, 0xffffff, 2);
@@ -145,6 +170,15 @@ function loadEnvironment(resolution = "2k", type = "HalfFloatType") {
     );
   });
 }
+
+effect(() => {
+  const shape = params.shape();
+  const geometry = params.geometry();
+  const noiseScale = params.noiseScale();
+  const torusRadius1 = params.torusRadius1();
+  const torusRadius2 = params.torusRadius2();
+  invalidateMap = true;
+});
 
 const envMap = await loadEnvironment();
 // const trefoil = new TrefoilSDF();
@@ -201,8 +235,8 @@ function createData(size, time) {
   const perlin = new ImprovedNoise();
   const vector = new Vector3();
   const data = [];
-  const t = new Vector2(0.7, 0.25);
-  const s = 2;
+  const t = new Vector2(params.torusRadius1(), params.torusRadius2());
+  const s = params.noiseScale();
   const rot = new Matrix4().makeRotationZ(time);
   const rot2 = new Matrix4().makeRotationX(time * 0.8);
   rot.multiply(rot2);
@@ -405,13 +439,13 @@ for (let level = LEVELS; level >= 2; level--) {
   pyramidData.push(currentData);
 }
 
-const gradient = new GradientLinear(rainbow);
+const gradient = new GradientLinear(palette);
 const levels = [];
 for (let level = LEVELS; level >= 1; level--) {
   const levelObject = new Level(
     level,
     1 / 2 ** (level - 1),
-    gradient.getAt(level / 8)
+    gradient.getAt(Maf.map(params.range()[0], params.range()[1], 0, 1, level))
   );
   levelObject.sync(pyramidData[LEVELS - level]);
   group.add(levelObject.mesh);
@@ -422,7 +456,7 @@ function init() {}
 
 init();
 
-camera.position.set(1, 1, 1).multiplyScalar(3);
+camera.position.set(0.56, 0.71, -0.41).multiplyScalar(3);
 camera.lookAt(0, 0, 0);
 
 function randomize() {}
@@ -439,7 +473,7 @@ render(() => {
 
   const dt = clock.getDelta();
 
-  if (running) {
+  if (running || invalidateMap) {
     time += dt * params.speed();
     const data = createData(size, time);
     const pyramidData = [data];
@@ -455,12 +489,18 @@ render(() => {
       const levelObject = levels[LEVELS - level];
       levelObject.sync(pyramidData[LEVELS - level]);
     }
+    invalidateMap = false;
   }
 
   for (const level of levels) {
     level.mesh.visible =
       level.level <= params.range()[1] && level.level >= params.range()[0];
     level.gap = params.gap();
+    // level.mesh.material.color.set(
+    //   gradient.getAt(Maf.map(1, LEVELS + 1, 0, 1, level.level))
+    // );
+    level.mesh.material.roughness = params.roughness();
+    level.mesh.material.metalness = params.metalness();
   }
 
   renderer.render(scene, camera);

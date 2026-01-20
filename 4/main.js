@@ -36,14 +36,12 @@ import {
   InstancedMesh,
   DirectionalLight,
 } from "three";
-// import { Material, loadEnvMap } from "modules/material.js";
-// import { RoundedCylinderGeometry } from "modules/rounded-cylinder-geometry.js";
 import { GradientLinear } from "modules/gradient.js";
 import { ImprovedNoise } from "third_party/ImprovedNoise.js";
 import { RoundedBoxGeometry } from "third_party/three-rounded-box.js";
 import { UltraHDRLoader } from "third_party/UltraHDRLoader.js";
 import { sdTorus, sdIcosahedron } from "modules/raymarch.js";
-import { TrefoilSDF } from "modules/TrefoilSDF.js";
+// import { TrefoilSDF } from "modules/TrefoilSDF.js";
 
 const LEVELS = 7;
 
@@ -149,7 +147,7 @@ function loadEnvironment(resolution = "2k", type = "HalfFloatType") {
 }
 
 const envMap = await loadEnvironment();
-const trefoil = new TrefoilSDF();
+// const trefoil = new TrefoilSDF();
 
 function blend(v) {
   const k = 9.5;

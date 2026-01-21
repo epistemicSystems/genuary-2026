@@ -126,13 +126,11 @@ const letters1 = {
       [0, 6.5],
       [0, 0],
       [4, 0],
-      [4, 4.5],
+      [4, 6.5],
     ],
     [
       [2, 1.5],
-      [2, 6],
-      [6, 6],
-      [6, -0.5],
+      [2, 6.5],
     ],
   ],
   u: [
@@ -388,7 +386,7 @@ function createThickPath(points, thickness) {
 }
 
 function generateStem(points) {
-  const pts = createThickPath(points, 1.2);
+  const pts = createThickPath(points, 1);
   const shape = new Shape();
   shape.moveTo(pts[0][0], pts[0][1]);
   for (let i = 0; i < pts.length; i++) {
@@ -407,7 +405,7 @@ function generateStem(points) {
   return geometry;
 }
 
-const letters = letters2;
+const letters = letters1;
 const material = new MeshStandardMaterial({
   color: rainbow[5],
   roughness: 1,
@@ -423,7 +421,7 @@ const word = [
   ["a", [0, 2]],
   ["r", [1, 2]],
   ["y", [0, 3]],
-  ["*", [1, 3]],
+  // ["*", [1, 3]],
 ];
 group.rotation.x = -Math.PI / 2;
 for (const letter of word) {
@@ -432,7 +430,7 @@ for (const letter of word) {
     mesh.castShadow = mesh.receiveShadow = true;
     mesh.geometry.scale(0.1, 0.1, 0.1);
     mesh.rotation.x = Math.PI;
-    mesh.position.set(letter[1][0], -letter[1][1] + 2, 0).multiplyScalar(0.8);
+    mesh.position.set(letter[1][0] * 0.6, (-letter[1][1] + 2) * 0.8, 0);
     group.add(mesh);
     bounds.expandByObject(mesh);
   }

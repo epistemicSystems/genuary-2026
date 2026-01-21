@@ -94,13 +94,13 @@ const geometries = [
 const gui = new GUI("4. Lowres", document.querySelector("#gui-container"));
 gui.addSelect(
   "Shape",
-  shapes.map((s) => [s.id, s.name]),
-  params.shape
+  params.shape,
+  shapes.map((s) => [s.id, s.name])
 );
 gui.addSelect(
   "Geometry",
-  geometries.map((s) => [s.id, s.name]),
-  params.geometry
+  params.geometry,
+  geometries.map((s) => [s.id, s.name])
 );
 gui.addSlider(
   "Noise Scale",

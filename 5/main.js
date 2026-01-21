@@ -12,21 +12,36 @@ import {
   Scene,
   Mesh,
   Color,
-  Vector3,
+  AmbientLight,
   HemisphereLight,
   Box3,
-  IcosahedronGeometry,
   Group,
-  TorusGeometry,
   ExtrudeGeometry,
   DirectionalLight,
+  FloatType,
+  EquirectangularReflectionMapping,
   MeshStandardMaterial,
+  PCFShadowMap,
+  PlaneGeometry,
+  ShadowMaterial,
   Shape,
-  MeshNormalMaterial,
 } from "three";
-import { Material, loadEnvMap } from "modules/material.js";
-import { RoundedCylinderGeometry } from "modules/rounded-cylinder-geometry.js";
-import { GradientLinear } from "modules/gradient.js";
+import { effectRAF } from "modules/reactive.js";
+import { letters as l1 } from "./letters1.js";
+import { letters as l2 } from "./letters2.js";
+import { letters as l3 } from "./letters3.js";
+import { UltraHDRLoader } from "third_party/UltraHDRLoader.js";
+
+const alphabets = [
+  { letters: l1, width: 5, height: 7 },
+  { letters: l2, width: 7, height: 7 },
+  { letters: l3, width: 5, height: 5 },
+];
+const alphabetOptions = [
+  [0, "LEtter1"],
+  [1, "LEtters2"],
+  [2, "LEtter3"],
+];
 
 const rainbow = [
   "#ef4444",
@@ -43,13 +58,12 @@ const rainbow = [
 
 const defaults = {
   seed: 1337,
-  points: 1,
-  range: [0, 0.25],
-  scale: 1,
-  roughness: 0.25,
+  alphabet: 0,
+  spacing: 1,
+  lineSpacing: 1,
+  roughness: 0.2,
   metalness: 0.5,
-  offsetAngle: 0,
-  offsetDistance: 0,
+  color: 3,
 };
 
 const params = fromDefaults(defaults);
@@ -58,13 +72,25 @@ const gui = new GUI(
   "5. Write “Genuary”. Avoid using a font.",
   document.querySelector("#gui-container")
 );
-gui.addSlider("Points", params.points, 1, 250, 1);
-gui.addRangeSlider("Range", params.range, 0, 1, 0.01);
-gui.addSlider("Scale", params.scale, 0.1, 2, 0.01);
-gui.addSlider("Roughness", params.roughness, 0, 1, 0.01);
-gui.addSlider("Metalness", params.metalness, 0, 1, 0.01);
-gui.addSlider("Offset Angle", params.offsetAngle, 0, Math.PI * 2, 0.01);
-gui.addSlider("Offset Distance", params.offsetDistance, 0, 2, 0.01);
+gui.addSelect("Alphabet", params.alphabet, alphabetOptions);
+gui.addSlider("Horiz. padding", params.spacing, -2, 2, 1);
+gui.addSlider("Vert. padding", params.lineSpacing, -2, 2, 1);
+gui.addSlider(
+  "Roughness",
+  params.roughness,
+  0,
+  1,
+  0.01,
+  (r) => (material.roughness = r)
+);
+gui.addSlider(
+  "Metalness",
+  params.metalness,
+  0,
+  1,
+  0.01,
+  (m) => (material.metalness = m)
+);
 gui.addButton("Random", randomize);
 gui.addSeparator();
 gui.addText(
@@ -72,20 +98,43 @@ gui.addText(
 );
 gui.show();
 
-const color = rainbow[rainbow.length - 1];
-renderer.setClearColor(new Color(color));
+const backgroundColor = rainbow[rainbow.length - 1];
+renderer.setClearColor(new Color(backgroundColor));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFShadowMap;
 
 const scene = new Scene();
 const group = new Group();
 scene.add(group);
 
+function darken(color) {
+  const hsl = {};
+  const c = new Color(color);
+  c.getHSL(hsl);
+  c.setHSL(hsl.h, hsl.s, hsl.l - 0.1);
+  return c;
+}
+
+const ground = new Mesh(
+  new PlaneGeometry(10, 10),
+  new ShadowMaterial({ color: darken(backgroundColor) })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const ambientLight = new AmbientLight(backgroundColor);
+scene.add(ambientLight);
+
 const light = new DirectionalLight(0xffffff, 3);
-light.position.set(3, 6, 3);
+light.position.set(-3, 6, -3);
 light.castShadow = true;
 light.shadow.camera.top = 3;
 light.shadow.camera.bottom = -3;
 light.shadow.camera.right = 3;
 light.shadow.camera.left = -3;
+// light.shadow.camera.near = 0.001;
+// light.shadow.camera.far = 100;
 light.shadow.mapSize.set(4096, 4096);
 scene.add(light);
 
@@ -94,245 +143,6 @@ hemiLight.color.setHSL(0.6, 1, 0.6);
 hemiLight.groundColor.setHSL(0.095, 1, 0.75);
 hemiLight.position.set(0, 50, 0);
 scene.add(hemiLight);
-
-const letters1 = {
-  g: [
-    [
-      [4.5, 0],
-      [0, 0],
-      [0, 6],
-      [4, 6],
-      [4, 2],
-      [2, 2],
-      [2, 4.5],
-    ],
-  ],
-  e: [
-    [
-      [4.5, 0],
-      [0, 0],
-      [0, 6],
-      [4.5, 6],
-    ],
-    [
-      [1.5, 2],
-      [4, 2],
-      [4, 4],
-      [1.5, 4],
-    ],
-  ],
-  n: [
-    [
-      [0, 6.5],
-      [0, 0],
-      [4, 0],
-      [4, 6.5],
-    ],
-    [
-      [2, 1.5],
-      [2, 6.5],
-    ],
-  ],
-  u: [
-    [
-      [0, -0.5],
-      [0, 6],
-      [4, 6],
-      [4, -0.5],
-    ],
-    [
-      [2, -0.5],
-      [2, 4.5],
-    ],
-  ],
-  a: [
-    [
-      [0, 6.5],
-      [0, 0],
-      [4, 0],
-      [4, 6.5],
-    ],
-    [
-      [2, 1.5],
-      [2, 2.5],
-    ],
-    [
-      [2, 3.5],
-      [2, 6.5],
-    ],
-  ],
-  r: [
-    [
-      [-0.5, 0],
-      [4, 0],
-      [4, 6.6],
-    ],
-    [
-      [1.5, 4],
-      [4, 4],
-    ],
-    [
-      [0, 6.5],
-      [0, 2],
-      [2.5, 2],
-    ],
-    [
-      [1.5, 6],
-      [2.5, 6],
-    ],
-  ],
-  y: [
-    [
-      [0, -0.5],
-      [0, 4],
-      [2.5, 4],
-    ],
-    [
-      [2, -0.5],
-      [2, 2.5],
-    ],
-    [
-      [-0.5, 6],
-      [4, 6],
-      [4, -0.5],
-    ],
-  ],
-};
-
-const letters2 = {
-  g: [
-    [
-      [6.5, 0],
-      [0, 0],
-      [0, 6],
-      [6, 6],
-      [6, 2],
-      [2, 2],
-      [2, 4],
-      [4.5, 4],
-    ],
-  ],
-  e: [
-    [
-      [6.5, 0],
-      [0, 0],
-      [0, 6],
-      [6.5, 6],
-    ],
-    [
-      [1.5, 2],
-      [6, 2],
-      [6, 4],
-      [1.5, 4],
-    ],
-  ],
-  n: [
-    [
-      [0, 6.5],
-      [0, 0],
-      [4, 0],
-      [4, 4.5],
-    ],
-    [
-      [2, 1.5],
-      [2, 6],
-      [6, 6],
-      [6, -0.5],
-    ],
-  ],
-  u: [
-    [
-      [0, -0.5],
-      [0, 6],
-      [6, 6],
-      [6, -0.5],
-    ],
-    [
-      [2, -0.5],
-      [2, 4],
-      [4, 4],
-      [4, -0.5],
-    ],
-  ],
-  a: [
-    [
-      [0, 6.5],
-      [0, 0],
-      [6, 0],
-      [6, 6.5],
-    ],
-    [
-      [1.5, 2],
-      [4.5, 2],
-    ],
-    [
-      [2, 6.5],
-      [2, 4],
-      [4, 4],
-      [4, 6.5],
-    ],
-  ],
-  r: [
-    [
-      [-0.5, 0],
-      [6, 0],
-      [6, 6.5],
-    ],
-    [
-      [1.5, 4],
-      [6, 4],
-    ],
-    [
-      [0, 6.5],
-      [0, 2],
-      [4.5, 2],
-    ],
-    [
-      [1.5, 6],
-      [4.5, 6],
-    ],
-  ],
-  y: [
-    [
-      [0, -0.5],
-      [0, 4],
-      [4.5, 4],
-    ],
-    [
-      [2, -0.5],
-      [2, 2],
-      [4, 2],
-      [4, -0.5],
-    ],
-    [
-      [-0.5, 6],
-      [6, 6],
-      [6, -0.5],
-    ],
-  ],
-  "*": [
-    [
-      [0, 2.5],
-      [0, 0],
-      [2.5, 0],
-    ],
-    [
-      [3.5, 0],
-      [6, 0],
-      [6, 2.5],
-    ],
-    [
-      [6, 3.5],
-      [6, 6],
-      [3.5, 6],
-    ],
-    [
-      [0, 3.5],
-      [0, 6],
-      [2.5, 6],
-    ],
-  ],
-};
 
 function createThickPath(points, thickness) {
   const halfWidth = thickness / 2;
@@ -405,53 +215,107 @@ function generateStem(points) {
   return geometry;
 }
 
-const letters = letters1;
-const material = new MeshStandardMaterial({
-  color: rainbow[5],
-  roughness: 1,
-  metalness: 0,
-});
-let offset = 0;
-const bounds = new Box3();
-const word = [
-  ["g", [0, 0]],
-  ["e", [1, 0]],
-  ["n", [0, 1]],
-  ["u", [1, 1]],
-  ["a", [0, 2]],
-  ["r", [1, 2]],
-  ["y", [0, 3]],
-  // ["*", [1, 3]],
-];
-group.rotation.x = -Math.PI / 2;
-for (const letter of word) {
-  for (const stem of letters[letter[0]]) {
-    const mesh = new Mesh(generateStem(stem), material);
-    mesh.castShadow = mesh.receiveShadow = true;
-    mesh.geometry.scale(0.1, 0.1, 0.1);
-    mesh.rotation.x = Math.PI;
-    mesh.position.set(letter[1][0] * 0.6, (-letter[1][1] + 2) * 0.8, 0);
-    group.add(mesh);
-    bounds.expandByObject(mesh);
-  }
-  offset = bounds.max.x - bounds.min.x + 0.1;
-}
-group.position.x = -offset / 2;
-scene.add(group);
+const loader = new UltraHDRLoader();
+loader.setDataType(FloatType);
+let envMap;
+let material;
 
-function init() {}
+function loadEnvironment(resolution = "2k", type = "HalfFloatType") {
+  return new Promise((resolve, reject) => {
+    loader.load(
+      `../assets/spruit_sunrise_${resolution}.hdr.jpg`,
+      function (texture) {
+        texture.mapping = EquirectangularReflectionMapping;
+        texture.needsUpdate = true;
+
+        resolve(texture);
+      }
+    );
+  });
+}
+
+function generate() {
+  while (group.children.length) {
+    const mesh = group.children[0];
+    mesh.geometry.dispose();
+    group.remove(mesh);
+  }
+  const alphabet = alphabets[params.alphabet()];
+  const letters = alphabet.letters;
+  let offset = 0;
+  const bounds = new Box3();
+  const word = [
+    ["g", [0, 0]],
+    ["e", [1, 0]],
+    ["n", [0, 1]],
+    ["u", [1, 1]],
+    ["a", [0, 2]],
+    ["r", [1, 2]],
+    ["y", [0, 3]],
+    ["*", [1, 3]],
+  ];
+  group.rotation.x = -Math.PI / 2;
+  const spacing = params.spacing();
+  const lineSpacing = params.lineSpacing();
+  for (const letter of word) {
+    for (const stem of letters[letter[0]]) {
+      const mesh = new Mesh(generateStem(stem), material);
+      mesh.castShadow = mesh.receiveShadow = true;
+      mesh.geometry.scale(0.1, 0.1, 0.1);
+      mesh.rotation.x = Math.PI;
+      mesh.position.set(
+        (letter[1][0] * (alphabet.width + spacing)) / 10,
+        ((-letter[1][1] + 2) * (alphabet.height + lineSpacing)) / 10,
+        0
+      );
+      group.add(mesh);
+      bounds.expandByObject(mesh);
+    }
+    offset = bounds.max.x - bounds.min.x + 0.1;
+  }
+  group.position.x = -offset / 2;
+  group.position.y = 0.1;
+  scene.add(group);
+}
+
+async function init() {
+  envMap = await loadEnvironment();
+  material = new MeshStandardMaterial({
+    color: rainbow[params.color()],
+    roughness: params.roughness(),
+    metalness: params.metalness(),
+    envMap,
+    envMapIntensity: 1,
+  });
+
+  generate();
+}
 
 init();
 
-camera.position.set(0, 1, 1).multiplyScalar(10);
+effectRAF(() => {
+  generate();
+});
+
+camera.position.set(0.15, 0.91, 0.37).multiplyScalar(6.6);
 camera.lookAt(0, 0, 0);
 
-function randomize() {}
+function randomize() {
+  const color = Maf.randomElement(rainbow);
+  material.color.set(color);
+  params.alphabet.set(Maf.randomElement(alphabetOptions)[0]);
+  // params.spacing.set(Maf.intRandomInRange(-1, 1));
+  // params.lineSpacing.set(Maf.intRandomInRange(-1, 1));
+  params.color.set(Maf.randomElement(rainbow));
+}
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyR") {
     randomize();
   }
+});
+document.querySelector("#randomize-button")?.addEventListener("click", () => {
+  randomize();
 });
 
 render(() => {

@@ -26,7 +26,7 @@ import {
   ShadowMaterial,
   Shape,
 } from "three";
-import { effectRAF } from "modules/reactive.js";
+import { effect, effectRAF } from "modules/reactive.js";
 import { letters as l1 } from "./letters1.js";
 import { letters as l2 } from "./letters2.js";
 import { letters as l3 } from "./letters3.js";
@@ -38,9 +38,9 @@ const alphabets = [
   { letters: l3, width: 5, height: 5 },
 ];
 const alphabetOptions = [
-  [0, "LEtter1"],
-  [1, "LEtters2"],
-  [2, "LEtter3"],
+  [0, "Letters 5x7"],
+  [1, "Letters 7x6"],
+  [2, "Letters 5x5"],
 ];
 
 const rainbow = [
@@ -75,22 +75,8 @@ const gui = new GUI(
 gui.addSelect("Alphabet", params.alphabet, alphabetOptions);
 gui.addSlider("Horiz. padding", params.spacing, -2, 2, 1);
 gui.addSlider("Vert. padding", params.lineSpacing, -2, 2, 1);
-gui.addSlider(
-  "Roughness",
-  params.roughness,
-  0,
-  1,
-  0.01,
-  (r) => (material.roughness = r)
-);
-gui.addSlider(
-  "Metalness",
-  params.metalness,
-  0,
-  1,
-  0.01,
-  (m) => (material.metalness = m)
-);
+gui.addSlider("Roughness", params.roughness, 0, 1, 0.01);
+gui.addSlider("Metalness", params.metalness, 0, 1, 0.01);
 gui.addButton("Random", randomize);
 gui.addSeparator();
 gui.addText(
@@ -288,14 +274,19 @@ async function init() {
     envMapIntensity: 1,
   });
 
+  effectRAF(() => {
+    generate();
+  });
+
+  effect(() => {
+    material.roughness = params.roughness();
+    material.metalness = params.metalness();
+  });
+
   generate();
 }
 
 init();
-
-effectRAF(() => {
-  generate();
-});
 
 camera.position.set(0.15, 0.91, 0.37).multiplyScalar(6.6);
 camera.lookAt(0, 0, 0);

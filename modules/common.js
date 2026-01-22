@@ -8,6 +8,7 @@ import {
 } from "three";
 import { OrbitControls } from "third_party/OrbitControls.js";
 import { signal } from "reactive";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 
 console.log("Common module loaded");
 
@@ -45,6 +46,8 @@ function getWebGLRenderer() {
 }
 
 const renderer = getWebGLRenderer();
+const composer = new EffectComposer(renderer);
+
 resize();
 
 function getCamera(fov) {
@@ -72,6 +75,7 @@ function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   renderer.setSize(w, h);
+  composer.setSize(w, h);
 
   for (const fn of resizeFns) {
     fn(w, h);
@@ -134,4 +138,5 @@ export {
   render,
   running,
   clock,
+  composer,
 };

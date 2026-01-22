@@ -151,7 +151,7 @@ vec4 linearToSRGB( in vec4 value ) {
     return vec4( mix( pow( value.rgb, vec3( 0.41666 ) ) * 1.055 - vec3( 0.055 ), value.rgb * 12.92, vec3( lessThanEqual( value.rgb, vec3( 0.0031308 ) ) ) ), value.a );
 }
 
-vec3 perturbNormal2Arb( vec3 worldPos, vec3 surf_norm, vec2 uv_coords, sampler2D tex, vec2 scale ) {
+vec3 perturbNormal2Arb( vec3 worldPos, vec3 surf_norm, vec2 uv_coords, in vec3 mapN ) {
     vec3 q0 = dFdx( worldPos.xyz ); vec3 q1 = dFdy( worldPos.xyz );
     vec2 st0 = dFdx( uv_coords.st ); vec2 st1 = dFdy( uv_coords.st );
     vec3 N = surf_norm;
@@ -161,8 +161,7 @@ vec3 perturbNormal2Arb( vec3 worldPos, vec3 surf_norm, vec2 uv_coords, sampler2D
     float det = max( dot( T, T ), dot( B, B ) );
     float scale_det = ( det == 0.0 ) ? 0.0 : inversesqrt( det );
     mat3 tsn = mat3( T * scale_det, B * scale_det, N );
-    vec3 mapN = texture( tex, uv_coords ).xyz * 2.0 - 1.0;
-    mapN.xy *= scale;
+    
     return normalize( tsn * mapN );
 }
 
@@ -400,14 +399,16 @@ vec3 shade(in vec3 worldPosition, in vec3 worldNormal, in vec2 uv, in vec4 diffu
     return outgoingLight;
 }
 
-void main() {
+void _main() {
     float r = roughness;
     float m = metalness;
 
     mat3 viewMatrixInverse = mat3(inverse(viewMatrix));
     vec3 worldNormal = normalize(viewMatrixInverse * vNormal);
     if (hasNormalMap) {
-        worldNormal = perturbNormal2Arb(vWorldPosition, worldNormal, vUv * normalRepeat, normalMap, normalScale);
+        vec3 mapN = texture( normalMap, vUv * normalRepeat ).xyz * 2.0 - 1.0;
+        mapN.xy *= normalScale;
+        worldNormal = perturbNormal2Arb(vWorldPosition, worldNormal, vUv * normalRepeat, mapN);
     }
     if (hasRoughnessMap) {
         r *= texture(roughnessMap, vUv * roughnessMapRepeat).r;
@@ -422,7 +423,7 @@ void main() {
         diffuseColor *= texColor;
     }
 
-    vec3 outgoingLight = shade(vWorldPosition, worldNormal, vUv, diffuseColor, r, m);
+    vec3 outgoingLight = shade(vWorldPosition, worldNormal, vUv, diffuseColor, r, m) ;
     outgoingLight = ACESFilmicToneMapping(outgoingLight);
     fragColor = linearToSRGB(vec4(outgoingLight, 1.0));
 }
@@ -446,7 +447,9 @@ class Material extends RawShaderMaterial {
   constructor(params) {
     super({
       vertexShader: params.vertexShader ?? vertexShader,
-      fragmentShader: params.fragmentShader ?? fragmentShader,
+      fragmentShader:
+        (params.fragmentShader ?? fragmentShader) +
+        (params.main ?? `void main() { _main(); }`),
       uniforms: {
         color: { value: params.uniforms.color },
         roughness: { value: params.uniforms.roughness },

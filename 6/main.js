@@ -4,6 +4,7 @@ import {
   camera,
   controls,
   render,
+  composer,
   running,
   clock,
 } from "common";
@@ -35,10 +36,13 @@ import { shader as triplanar } from "shaders/triplanar.js";
 import { shader as raymarch } from "shaders/raymarch.js";
 import { shader as sdfs } from "shaders/sdfs.js";
 import { shader as easings } from "shaders/easings.js";
-import { tweened } from "reactive";
+import { tweened, effect, effectRAF } from "reactive";
 // import { shader as perlin } from "shaders/perlinSimplex3D.js";
 import { shader as perlin } from "shaders/perlinClassic3D.js";
 import { Easings } from "easings";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const rainbow = [
   "#ef4444",
@@ -55,18 +59,15 @@ const rainbow = [
 
 const defaults = {
   seed: 1337,
-  points: 1,
-  range: [0, 0.25],
+  fingerprints: 100,
   scale: 1,
   roughness: 0.25,
   metalness: 0.5,
-  offsetAngle: 0,
-  offsetDistance: 0,
   lights: true,
 };
 
 const blendFactor = tweened(0, 1000);
-const scaleFactor = tweened(0, 1000);
+const lightsFactor = tweened(0, 100);
 
 const colorFrom = new Color(Maf.randomElement(rainbow));
 const colorTo = new Color(Maf.randomElement(rainbow));
@@ -78,13 +79,10 @@ const gui = new GUI(
   document.querySelector("#gui-container")
 );
 gui.addCheckbox("Lights", params.lights);
-gui.addSlider("Points", params.points, 1, 250, 1);
-gui.addRangeSlider("Range", params.range, 0, 1, 0.01);
+gui.addSlider("Fingerprints", params.fingerprints, 0, 1000, 1);
 gui.addSlider("Scale", params.scale, 0.1, 2, 0.01);
 gui.addSlider("Roughness", params.roughness, 0, 1, 0.01);
 gui.addSlider("Metalness", params.metalness, 0, 1, 0.01);
-gui.addSlider("Offset Angle", params.offsetAngle, 0, Math.PI * 2, 0.01);
-gui.addSlider("Offset Distance", params.offsetDistance, 0, 2, 0.01);
 gui.addButton("Random", randomize);
 gui.addSeparator();
 gui.addText(
@@ -115,11 +113,16 @@ hemiLight.groundColor.setHSL(0.095, 1, 0.75);
 hemiLight.position.set(0, 50, 0);
 scene.add(hemiLight);
 
-const texureLoader = new TextureLoader();
 const fingerprints = new Image();
 fingerprints.src = "../assets/fingerprints.jpg";
+await new Promise((resolve, reject) => {
+  fingerprints.addEventListener("load", (e) => {
+    resolve();
+  });
+});
 
 function generateMap() {
+  console.log("MAP");
   const canvas = document.createElement("canvas");
   canvas.width = 2048;
   canvas.height = 2048;
@@ -130,14 +133,14 @@ function generateMap() {
   const fingerprintWidth = fingerprints.width / 4;
   const fingerPrintHeight = fingerprints.height / 2;
 
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < params.fingerprints(); i++) {
     const srcX = Maf.intRandomInRange(0, 4) * fingerprintWidth;
     const srcY = Maf.intRandomInRange(0, 4) * fingerPrintHeight;
     const posX = Maf.randomInRange(0, canvas.width);
     const posY = Maf.randomInRange(0, canvas.height);
     const rot = Maf.randomInRange(0, Maf.TAU);
 
-    const s = Maf.randomInRange(0.2, 0.5) * 2;
+    const s = Maf.randomInRange(0.2, 0.5) * 2 * params.scale();
     const w = fingerprintWidth * s;
     const h = fingerPrintHeight * s;
 
@@ -316,6 +319,8 @@ const main = `
 ${triplanar}
 
 uniform bool lights_on;
+uniform vec3 uvColor;
+uniform float uvLightIntensity;
 
 void main() { 
 
@@ -333,11 +338,11 @@ void main() {
       } 
       if (hasRoughnessMap) {
           vec4 texColor = triplanarTexture(vPosition, worldNormal, roughnessMap, 1.);
-          r *= texColor.r;
+          r += texColor.r;
       }
       if (hasMetalnessMap) {
           vec4 texColor = triplanarTexture(vPosition, worldNormal, metalnessMap, 1.);
-          m *= texColor.r;
+          m += texColor.r;
       }
       vec4 diffuseColor = vec4(color, 1.0);
       if (hasMap) {
@@ -350,7 +355,8 @@ void main() {
       outgoingLight = ACESFilmicToneMapping(outgoingLight);
       fragColor = linearToSRGB(vec4(outgoingLight, 1.0));
   } else {
-      vec3 outgoingLight = triplanarTexture(vPosition, worldNormal, map, 1.).rgb  *10.;
+      vec4 diffuseColor = vec4(uvColor, 1.0);
+      vec3 outgoingLight = diffuseColor.rgb * triplanarTexture(vPosition, worldNormal, map, 1.).rgb * 10. * uvLightIntensity;
       outgoingLight = pow(outgoingLight, vec3(2.2)); 
       outgoingLight = ACESFilmicToneMapping(outgoingLight);
       fragColor = linearToSRGB(vec4(outgoingLight, 1.0));
@@ -360,60 +366,50 @@ void main() {
 
 let mesh;
 
+const material = new Material({
+  vertexShader,
+  main,
+  uniforms: {
+    color: new Color(rainbow[2]),
+    roughness: 0.2,
+    metalness: 0.5,
+    map: null,
+    hasMap: false,
+    normalMap: null,
+    hasNormalMap: false,
+    normalScale: new Vector2(0.5, 0.5),
+    roughnessMap: null,
+    hasRoughnessMap: false,
+    metalnessMap: null,
+    hasMetalnessMap: false,
+  },
+  customUniforms: {
+    lights_on: { value: true },
+    shapeFrom: { value: 0 },
+    shapeTo: { value: 1 },
+    factor: { value: 0 },
+    uvColor: { value: new Color(rainbow[5]) },
+    uvLightIntensity: { value: 0 },
+  },
+});
+
 async function init() {
   const envMap = await loadEnvMap(
     `../assets/spruit_sunrise_2k.hdr.jpg`,
     renderer
   );
 
-  const albedo = generateMap();
-  const map = new CanvasTexture(albedo);
-  map.wrapS = map.wrapT = RepeatWrapping;
-  map.anisotropy = renderer.capabilities.getMaxAnisotropy();
-
-  const normalMap = createNormalMap(map);
-  normalMap.setSize(albedo.width, albedo.height);
-  normalMap.render();
-  normalMap.fbo.texture.wrapS = normalMap.fbo.texture.wrapT = RepeatWrapping;
-  normalMap.fbo.texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-
-  const material = new Material({
-    vertexShader,
-    main,
-    uniforms: {
-      color: new Color(rainbow[2]),
-      roughness: 0.2,
-      metalness: 0.5,
-      map: map,
-      hasMap: false,
-      normalMap: normalMap.fbo.texture,
-      hasNormalMap: true,
-      normalScale: new Vector2(0.5, 0.5),
-      roughnessMap: map,
-      hasRoughnessMap: true,
-      metalnessMap: map,
-      hasMetalnessMap: !true,
-    },
-    customUniforms: {
-      lights_on: { value: true },
-      shapeFrom: { value: 0 },
-      shapeTo: { value: 1 },
-      factor: { value: 0 },
-    },
-  });
   material.envMap = envMap;
   material.syncLights(scene);
   material.syncRenderer(renderer);
 
-  // mesh = new Mesh(new TorusKnotGeometry(1, 0.3, 200, 36), material);
-  //  mesh = new Mesh(new TorusGeometry(1, 0.3, 36, 100), material);
   mesh = new Mesh(new IcosahedronGeometry(2, 50), material);
   scene.add(mesh);
 }
 
 init();
 
-camera.position.set(0, 0, 1).multiplyScalar(10);
+camera.position.set(1, 0.6, 1).multiplyScalar(2);
 camera.lookAt(0, 0, 0);
 
 function randomize() {
@@ -430,16 +426,74 @@ function randomize() {
   );
   blendFactor.reset(0);
   blendFactor.set(1, 1000);
+
+  params.fingerprints.set(Maf.intRandomInRange(100, 500));
+  params.scale.set(Maf.randomInRange(0.8, 1.2));
 }
+
+effect(() => {
+  const l = params.lights();
+  if (l) {
+    lightsFactor.set(1, 100);
+  } else {
+    lightsFactor.set(0, 100);
+  }
+});
+
+effectRAF(() => {
+  const albedo = generateMap();
+  const map = new CanvasTexture(albedo);
+  map.wrapS = map.wrapT = RepeatWrapping;
+  map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  const normalMap = createNormalMap(map);
+  normalMap.setSize(albedo.width, albedo.height);
+  normalMap.render();
+  normalMap.fbo.texture.wrapS = normalMap.fbo.texture.wrapT = RepeatWrapping;
+  normalMap.fbo.texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  material.uniforms.map.value = map;
+  material.uniforms.hasMap.value = false;
+
+  material.uniforms.normalMap.value = normalMap.fbo.texture;
+  material.uniforms.hasNormalMap.value = true;
+
+  material.uniforms.roughnessMap.value = map;
+  material.uniforms.hasRoughnessMap.value = true;
+});
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyR") {
     randomize();
   }
+  if (e.code === "Space") {
+    params.lights.set(!params.lights());
+  }
 });
 document.querySelector("#randomize-button")?.addEventListener("click", () => {
   randomize();
 });
+
+const renderScene = new RenderPass(scene, camera);
+
+const bloomPass = new UnrealBloomPass(
+  new Vector2(window.innerWidth, window.innerHeight),
+  0,
+  0,
+  0
+);
+bloomPass.threshold = 0;
+bloomPass.strength = 0.5;
+bloomPass.radius = 0.1;
+
+const outputPass = new OutputPass();
+
+composer.addPass(renderScene);
+composer.addPass(bloomPass);
+composer.addPass(outputPass);
+
+const black = new Color(0);
+const bkgColor = new Color();
 
 render(() => {
   controls.update();
@@ -456,9 +510,18 @@ render(() => {
       colorTo,
       Easings.OutCubic(blendFactor())
     );
+    renderer.setClearColor(
+      params.lights() ? mesh.material.uniforms.color.value : black
+    );
+    mesh.material.uniforms.uvLightIntensity.value = 1 - lightsFactor();
   }
 
-  renderer.setClearColor(params.lights() ? new Color(color) : 0);
+  bloomPass.radius = 0.1;
+  bloomPass.strength = 0.5;
 
-  renderer.render(scene, camera);
+  if (params.lights()) {
+    renderer.render(scene, camera);
+  } else {
+    composer.render();
+  }
 });
